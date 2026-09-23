@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23121212'/%3E%3Cpath d='M7 15h10M12 15V9' stroke='%233ecf8e' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='7' r='2' fill='%233ecf8e'/%3E%3C/svg%3E">
+<title data-i18n="graph.pageTitle">Карта проекта</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  * { box-sizing: border-box; }
+  body { font: 13px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app {
+    display: grid; grid-template-columns: 232px 1fr 300px; grid-template-rows: 44px 1fr;
+    grid-template-areas: "top top top" "left canvas right";
+  }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  /* Отсечение это не ошибка, но человек должен видеть, что карта неполная. */
+  .stat.clipped span { color: var(--amber); }
+
+  header {
+    grid-area: top; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  header .brand { display: inline; font-weight: 650; letter-spacing: .2px; }
+  header .root { color: var(--fg-subtle); font-size: 11.5px; }
+  header .spacer { margin-left: auto; }
+  button {
+    font: inherit; color: var(--fg); background: var(--card-hover);
+    border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  }
+  button:hover { border-color: var(--brand); }
+
+  aside {
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 12px; overflow-y: auto;
+  }
+  aside.right { grid-area: right; border-right: 0; border-left: 1px solid var(--border); }
+  aside.left { grid-area: left; }
+  .label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--fg-subtle); margin: 14px 0 6px;
+  }
+  .label:first-child { margin-top: 0; }
+  input[type=search] {
+    width: 100%; font: inherit; color: var(--fg); background: var(--card-hover);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+  }
+  input[type=search]::placeholder { color: var(--fg-subtle); }
+
+  .filter { display: flex; align-items: center; gap: 7px; padding: 3px 0; cursor: pointer; }
+  .filter input { accent-color: var(--brand); margin: 0; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .filter .count { margin-left: auto; color: var(--fg-subtle); font-size: 11px; }
+
+  .stat { display: flex; justify-content: space-between; padding: 2px 0; color: var(--fg-muted); }
+  .stat b { color: var(--fg); font-weight: 600; }
+
+  .session { padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .session:last-child { border-bottom: 0; }
+  .session .when { color: var(--fg-muted); font-size: 11.5px; }
+  .session .n { color: var(--brand); font-size: 11.5px; }
+
+  main { grid-area: canvas; position: relative; overflow: hidden; }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  svg:active { cursor: grabbing; }
+  .hint {
+    position: absolute; left: 12px; bottom: 10px; color: var(--fg-subtle); font-size: 11.5px;
+    pointer-events: none;
+  }
+  .empty {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    color: var(--fg-muted); text-align: center; padding: 24px;
+  }
+
+  .link { stroke: var(--border); stroke-width: 1.2; }
+  .link.contains { stroke-dasharray: 2 3; opacity: .5; }
+  .link.hot { stroke: var(--brand); stroke-width: 1.8; opacity: 1; }
+  .node { cursor: pointer; }
+  .node rect { rx: 4; stroke-width: 1; }
+  .node text { font-size: 10.5px; dominant-baseline: middle; pointer-events: none; }
+  .node.faded { opacity: .18; }
+  .node.picked rect { stroke: var(--fg); stroke-width: 2; }
+
+  .detail h2 { font-size: 14px; margin: 0 0 2px; word-break: break-word; }
+  .detail .sub { color: var(--fg-muted); font-size: 11.5px; margin-bottom: 12px; }
+  .tag {
+    display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    padding: 2px 6px; border-radius: 4px; margin-right: 4px;
+  }
+  .anchor {
+    background: var(--card-hover); border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 9px; margin-bottom: 8px; font-size: 11.5px; word-break: break-all;
+  }
+  .rel { padding: 3px 0; color: var(--fg-muted); font-size: 11.5px; word-break: break-all; }
+  .rel b { color: var(--fg); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <span class="brand" data-i18n="graph.title"></span>
+  <span class="root mono" id="root"></span>
+  <span class="spacer"></span>
+  <button id="refit" data-i18n="action.fit"></button>
+  <button id="reload" data-i18n="action.reload"></button>
+</header>
+
+<aside class="left">
+  <div class="label" data-i18n="graph.search"></div>
+  <input type="search" id="search" data-i18n-placeholder="graph.searchPlaceholder" autocomplete="off">
+
+  <div class="label" data-i18n="graph.show"></div>
+  <div id="filters">
+    <div class="skel skel-line" style="width:80%;height:16px;margin-bottom:8px"></div>
+    <div class="skel skel-line" style="width:72%;height:16px;margin-bottom:8px"></div>
+    <div class="skel skel-line" style="width:76%;height:16px;margin-bottom:8px"></div>
+  </div>
+
+  <div class="label" data-i18n="graph.map"></div>
+  <div id="stats">
+    <div class="skel skel-line" style="width:100%;height:14px;margin-bottom:7px"></div>
+    <div class="skel skel-line" style="width:100%;height:14px;margin-bottom:7px"></div>
+    <div class="skel skel-line" style="width:100%;height:14px"></div>
+  </div>
+
+  <div class="label" data-i18n="graph.sessions"></div>
+  <div id="sessions">
+    <div class="skel skel-line" style="width:100%;height:26px;margin-bottom:7px"></div>
+    <div class="skel skel-line" style="width:100%;height:26px"></div>
+  </div>
+</aside>
+
+<main>
+  <svg id="canvas"></svg>
+  <div class="loading" id="canvasWait" style="position:absolute;inset:0"><span class="spinner"></span></div>
+  <div class="hint" data-i18n="graph.hint"></div>
+</main>
+
+<aside class="right">
+  <div class="detail" id="detail">
+    <div class="sub" data-i18n="graph.pickNode"></div>
+  </div>
+</aside>
+
+</div>
+
+<script src="/d3.min.js"></script>
+<script type="module">
+import { initLang, applyI18n, t } from '/i18n.js'
+
+initLang()
+applyI18n()
+
+const KIND_COLOR = {
+  module: 'var(--brand)', class: '#c77dff', function: '#5b9cff',
+  method: 'var(--amber)', interface: '#ff7a9c',
+}
+const KIND_LABEL = {
+  module: t('graph.kindModule'), class: t('graph.kindClass'), function: t('graph.kindFunction'),
+  method: t('graph.kindMethod'), interface: t('graph.kindInterface'),
+}
+const STATUS_COLOR = { implemented: 'var(--brand)', planned: 'var(--amber)', drifted: 'var(--red)', removed: 'var(--red)' }
+
+let graph = { nodes: [], edges: [], sessions: [], root: '' }
+let sim = null
+let picked = null
+const hidden = new Set()
+let query = ''
+
+const svg = d3.select('#canvas')
+const zoomLayer = svg.append('g')
+const linkLayer = zoomLayer.append('g')
+const nodeLayer = zoomLayer.append('g')
+
+const zoom = d3.zoom().scaleExtent([0.15, 4]).on('zoom', (e) => {
+  zoomLayer.attr('transform', e.transform)
+})
+svg.call(zoom)
+
+function kindOf(n) { return n.kind === 'module' ? 'module' : (n.symbolKind || 'other') }
+function colorOf(n) { return KIND_COLOR[kindOf(n)] || 'var(--fg-subtle)' }
+function labelOf(n) { return n.kind === 'module' ? n.title.split('/').pop() : n.title }
+
+function width(n) {
+  const text = labelOf(n)
+  return Math.max(46, Math.min(190, text.length * 6.1 + 18))
+}
+
+async function load() {
+  const res = await fetch('/api/graph')
+  graph = await res.json()
+  document.getElementById('root').textContent = graph.root
+  buildFilters()
+  buildStats()
+  buildSessions()
+  render()
+  // Крутилка снимается только после первой укладки, иначе на её месте
+  // несколько кадров видно пустое полотно.
+  document.getElementById('canvasWait').remove()
+}
+
+/*
+ * Потолок узлов на полотне. Силовая укладка считает притяжение каждой пары на
+ * каждом кадре, и на десяти тысячах узлов браузер выдавал два кадра в секунду,
+ * то есть страница просто стояла. Замерено на проекте из двух тысяч файлов.
+ *
+ * Отбираются самые связанные: узел, от которого зависит многое, на карте нужен,
+ * а лист дерева без связей не говорит почти ничего. Поиск и фильтры работают до
+ * отсечения, поэтому найти можно что угодно, даже если оно не попало на полотно.
+ */
+const MAX_DRAWN = 700
+
+let clipped = 0
+
+function degrees() {
+  const count = new Map()
+  const bump = (id) => count.set(id, (count.get(id) ?? 0) + 1)
+  for (const e of graph.edges) {
+    bump(e.from)
+    bump(e.to)
+  }
+  return count
+}
+
+function visibleNodes() {
+  const q = query.trim().toLowerCase()
+  const matched = graph.nodes.filter((n) => {
+    if (hidden.has(kindOf(n))) return false
+    if (!q) return true
+    return n.title.toLowerCase().includes(q) || (n.file || '').toLowerCase().includes(q)
+  })
+
+  clipped = Math.max(0, matched.length - MAX_DRAWN)
+  if (clipped === 0) return matched
+
+  const weight = degrees()
+  return [...matched]
+    .sort((a, b) => (weight.get(b.id) ?? 0) - (weight.get(a.id) ?? 0))
+    .slice(0, MAX_DRAWN)
+}
+
+function render() {
+  const nodes = visibleNodes().map((n) => ({ ...n }))
+  if (graph.nodes.length > 0) buildStats()
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const moduleByFile = new Map()
+  for (const n of nodes) if (n.kind === 'module' && n.file) moduleByFile.set(n.file, n.id)
+
+  const links = []
+  for (const e of graph.edges) {
+    if (byId.has(e.from) && byId.has(e.to)) links.push({ source: e.from, target: e.to, kind: e.kind })
+  }
+  // Символ соединяется со своим модулем: в графе такого ребра нет, но без него
+  // символы висят отдельным облаком и по карте невозможно читать файлы.
+  for (const n of nodes) {
+    if (n.kind === 'symbol' && n.file) {
+      const owner = moduleByFile.get(n.file)
+      if (owner && owner !== n.id) links.push({ source: owner, target: n.id, kind: 'contains' })
+    }
+  }
+
+  document.querySelector('.empty')?.remove()
+  if (nodes.length === 0) {
+    const div = document.createElement('div')
+    div.className = 'empty'
+    div.textContent = t('graph.noMatch')
+    document.querySelector('main').appendChild(div)
+  }
+
+  const link = linkLayer.selectAll('line').data(links, (d) => `${d.source}~${d.target}~${d.kind}`)
+  link.exit().remove()
+  const linkEnter = link.enter().append('line').attr('class', (d) => `link ${d.kind}`)
+  const allLinks = linkEnter.merge(link)
+
+  const node = nodeLayer.selectAll('g.node').data(nodes, (d) => d.id)
+  node.exit().remove()
+  const enter = node.append ? node.enter().append('g').attr('class', 'node') : null
+  enter.append('rect')
+  enter.append('text')
+  const allNodes = enter.merge(node)
+
+  allNodes.select('rect')
+    .attr('width', (d) => width(d))
+    .attr('height', 20)
+    .attr('x', (d) => -width(d) / 2)
+    .attr('y', -10)
+    .attr('fill', (d) => d.status === 'removed' ? 'var(--card-hover)' : colorOf(d))
+    .attr('fill-opacity', (d) => d.kind === 'module' ? 0.22 : 0.16)
+    .attr('stroke', (d) => d.status === 'removed' ? 'var(--red)' : colorOf(d))
+
+  allNodes.select('text')
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg)')
+    .text((d) => labelOf(d))
+
+  allNodes.on('click', (event, d) => { picked = d.id; showDetail(d); paintSelection(allNodes, allLinks) })
+  allNodes.call(d3.drag()
+    .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.2).restart(); d.fx = d.x; d.fy = d.y })
+    .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y })
+    .on('end', (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null }))
+
+  if (sim) sim.stop()
+  sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id((d) => d.id).distance((l) => l.kind === 'contains' ? 34 : 120).strength((l) => l.kind === 'contains' ? 0.7 : 0.12))
+    .force('charge', d3.forceManyBody().strength(-260))
+    .force('collide', d3.forceCollide().radius((d) => width(d) / 2 + 9))
+    .force('center', d3.forceCenter(0, 0))
+    .on('tick', () => {
+      allLinks
+        .attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
+        .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y)
+      allNodes.attr('transform', (d) => `translate(${d.x},${d.y})`)
+    })
+    .on('end', () => fit())
+
+  paintSelection(allNodes, allLinks)
+  setTimeout(fit, 400)
+}
+
+function paintSelection(allNodes, allLinks) {
+  if (!picked) {
+    allNodes.classed('faded', false).classed('picked', false)
+    allLinks.classed('hot', false)
+    return
+  }
+  const near = new Set([picked])
+  allLinks.each((l) => {
+    const a = l.source.id ?? l.source, b = l.target.id ?? l.target
+    if (a === picked) near.add(b)
+    if (b === picked) near.add(a)
+  })
+  allNodes.classed('faded', (d) => !near.has(d.id)).classed('picked', (d) => d.id === picked)
+  allLinks.classed('hot', (l) => (l.source.id ?? l.source) === picked || (l.target.id ?? l.target) === picked)
+}
+
+function showDetail(d) {
+  const inbound = graph.edges.filter((e) => e.to === d.id)
+  const outbound = graph.edges.filter((e) => e.from === d.id)
+  const title = (id) => graph.nodes.find((n) => n.id === id)?.title ?? id
+  const kind = kindOf(d)
+
+  document.getElementById('detail').innerHTML = `
+    <h2>${escapeHtml(d.title)}</h2>
+    <div class="sub">
+      <span class="tag" style="color:${colorOf(d)};background:color-mix(in srgb, ${colorOf(d)} 16%, transparent)">${KIND_LABEL[kind] ?? kind}</span>
+      <span class="tag" style="color:${STATUS_COLOR[d.status] || 'var(--fg-muted)'};background:color-mix(in srgb, ${STATUS_COLOR[d.status] || 'var(--fg-muted)'} 16%, transparent)">${d.status}</span>
+      <span class="tag" style="color:var(--fg-muted);background:var(--card-hover)">${d.source}</span>
+    </div>
+    ${d.file ? `<div class="anchor mono">${escapeHtml(d.file)}${d.startLine ? `:${d.startLine}` : ''}${d.endLine && d.endLine !== d.startLine ? `-${d.endLine}` : ''}</div>` : ''}
+    <div class="label">${t('graph.inbound')} (${inbound.length})</div>
+    ${inbound.length ? inbound.map((e) => `<div class="rel mono">${escapeHtml(title(e.from))}</div>`).join('') : `<div class="rel">${t('graph.none')}</div>`}
+    <div class="label">${t('graph.outbound')} (${outbound.length})</div>
+    ${outbound.length ? outbound.map((e) => `<div class="rel mono">${escapeHtml(title(e.to))}</div>`).join('') : `<div class="rel">${t('graph.none')}</div>`}
+    <div class="label">${t('graph.identifier')}</div>
+    <div class="rel mono">${d.id}</div>
+  `
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+}
+
+function buildFilters() {
+  const counts = new Map()
+  for (const n of graph.nodes) counts.set(kindOf(n), (counts.get(kindOf(n)) || 0) + 1)
+  const box = document.getElementById('filters')
+  box.innerHTML = ''
+  for (const [kind, count] of [...counts].sort((a, b) => b[1] - a[1])) {
+    const row = document.createElement('label')
+    row.className = 'filter'
+    row.innerHTML = `
+      <input type="checkbox" ${hidden.has(kind) ? '' : 'checked'}>
+      <span class="swatch" style="background:${KIND_COLOR[kind] || 'var(--fg-subtle)'}"></span>
+      <span>${KIND_LABEL[kind] || kind}</span>
+      <span class="count">${count}</span>`
+    row.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) hidden.delete(kind); else hidden.add(kind)
+      render()
+    })
+    box.appendChild(row)
+  }
+}
+
+function buildStats() {
+  const live = graph.nodes.filter((n) => n.status !== 'removed').length
+  const gone = graph.nodes.length - live
+  const files = new Set(graph.nodes.filter((n) => n.kind === 'module').map((n) => n.file)).size
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><span>${t('graph.nodes')}</span><b>${live}</b></div>
+    ${gone ? `<div class="stat"><span>${t('graph.removed')}</span><b>${gone}</b></div>` : ''}
+    <div class="stat"><span>${t('graph.edges')}</span><b>${graph.edges.length}</b></div>
+    <div class="stat"><span>${t('graph.files')}</span><b>${files}</b></div>
+    ${clipped ? `<div class="stat clipped"><span>${t('graph.clipped', { n: clipped })}</span></div>` : ''}`
+}
+
+function buildSessions() {
+  const box = document.getElementById('sessions')
+  box.innerHTML = graph.sessions.slice(0, 6).map((s) => {
+    const when = new Date(s.startedAt).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    return `<div class="session"><div class="when">${when}, ${escapeHtml(s.agent)}</div><div class="n">+${s.changed} ${t('graph.records')}</div></div>`
+  }).join('') || `<div class="rel">${t('graph.noSessions')}</div>`
+}
+
+function fit() {
+  const nodes = sim ? sim.nodes() : []
+  if (!nodes.length) return
+  const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y)
+  const minX = Math.min(...xs), maxX = Math.max(...xs)
+  const minY = Math.min(...ys), maxY = Math.max(...ys)
+  const box = document.querySelector('main').getBoundingClientRect()
+  const scale = Math.min(2, 0.88 / Math.max((maxX - minX) / box.width, (maxY - minY) / box.height))
+  const t = d3.zoomIdentity
+    .translate(box.width / 2, box.height / 2)
+    .scale(Number.isFinite(scale) && scale > 0 ? scale : 1)
+    .translate(-(minX + maxX) / 2, -(minY + maxY) / 2)
+  svg.transition().duration(350).call(zoom.transform, t)
+}
+
+document.getElementById('search').addEventListener('input', (e) => { query = e.target.value; render() })
+document.getElementById('reload').addEventListener('click', load)
+document.getElementById('refit').addEventListener('click', fit)
+
+load()
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+Copyright (c) 2026 unknow. All rights reserved.
+
+Исходный код этого проекта открыт для чтения, но не передан в свободное
+пользование. Лицензия проприетарная.
+
+Разрешается:
+
+  - читать исходный код и изучать его;
+  - клонировать репозиторий, собирать проект и запускать его локально с целью
+    ознакомления или оценки;
+  - цитировать фрагменты кода в обсуждениях, обзорах и учебных материалах со
+    ссылкой на источник.
+
+Запрещается без предварительного письменного разрешения правообладателя:
+
+  - использовать проект или его части в коммерческих целях, в том числе внутри
+    организации;
+  - распространять, публиковать, перепродавать проект или производные от него
+    работы;
+  - создавать производные продукты и сервисы на его основе;
+  - удалять или изменять уведомления об авторских правах.
+
+Разрешение запрашивается у правообладателя. Права, прямо не предоставленные
+здесь, сохраняются за правообладателем.
+
+ПРОГРАММА ПОСТАВЛЯЕТСЯ «КАК ЕСТЬ», БЕЗ КАКИХ-ЛИБО ГАРАНТИЙ, ЯВНЫХ ИЛИ
+ПОДРАЗУМЕВАЕМЫХ, ВКЛЮЧАЯ ГАРАНТИИ ТОВАРНОЙ ПРИГОДНОСТИ, ПРИГОДНОСТИ ДЛЯ
+КОНКРЕТНОЙ ЦЕЛИ И НЕНАРУШЕНИЯ ПРАВ. НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ
+ПРАВООБЛАДАТЕЛЬ НЕ НЕСЁТ ОТВЕТСТВЕННОСТИ ПО ИСКАМ, ЗА УЩЕРБ ИЛИ ИНЫЕ
+ТРЕБОВАНИЯ, ВОЗНИКШИЕ ИЗ ИСПОЛЬЗОВАНИЯ ПРОГРАММЫ ИЛИ ИНЫХ ДЕЙСТВИЙ С НЕЙ.
+
+---
+
+Copyright (c) 2026 unknow. All rights reserved.
+
+The source code of this project is available for reading but is not placed in
+the public domain and is not free software. The license is proprietary.
+
+You may:
+
+  - read and study the source code;
+  - clone the repository, build the project and run it locally for evaluation
+    purposes;
+  - quote fragments of the code in discussions, reviews and educational
+    materials with attribution.
+
+You may not, without prior written permission from the copyright holder:
+
+  - use the project or any part of it for commercial purposes, including
+    internal use within an organisation;
+  - distribute, publish or resell the project or works derived from it;
+  - build derivative products or services on top of it;
+  - remove or alter copyright notices.
+
+Permission is requested from the copyright holder. All rights not expressly
+granted here are reserved.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

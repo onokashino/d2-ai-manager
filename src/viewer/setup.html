@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23121212'/%3E%3Cpath d='M7 15h10M12 15V9' stroke='%233ecf8e' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='7' r='2' fill='%233ecf8e'/%3E%3C/svg%3E">
+<title data-i18n="setup.pageTitle">Настройка проекта</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .wrap { height: 100%; overflow-y: auto; scrollbar-gutter: stable both-edges; }
+  .inner { max-width: 760px; margin: 0 auto; padding: 28px 28px 0; }
+
+  .head { padding-bottom: 18px; border-bottom: 1px solid var(--border); margin-bottom: 26px; }
+  .head h1 { font-size: var(--t-2xl); margin: 0 0 4px; font-weight: 600; letter-spacing: -.02em; }
+  .head .path { font-family: var(--mono); font-size: var(--t-xs); color: var(--fg-subtle); }
+
+  section { margin-bottom: 30px; }
+  section h2 { font-size: var(--t-lg); margin: 0 0 4px; font-weight: 550; letter-spacing: -.01em; }
+  section .why { margin: 0 0 14px; color: var(--fg-muted); font-size: var(--t-sm); line-height: 1.55; }
+
+  .tree { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+  .tree label {
+    display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px;
+    padding: 9px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s;
+  }
+  .tree label:last-child { border-bottom: none; }
+  .tree label:hover { background: var(--surface); }
+  .tree .name { font-family: var(--mono); font-size: var(--t-sm); }
+  .tree .nested .name { padding-left: 18px; color: var(--fg-muted); }
+  .tree .count { font-family: var(--mono); font-size: var(--t-2xs); color: var(--fg-subtle); }
+
+  input[type=text], input[type=number], textarea {
+    width: 100%; background: var(--card); color: var(--fg); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 9px 12px; font-family: var(--mono); font-size: var(--t-sm);
+  }
+  textarea { min-height: 84px; resize: vertical; line-height: 1.6; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field label { display: block; font-size: var(--t-xs); color: var(--fg-subtle); margin-bottom: 6px; }
+  .toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: var(--t-sm); }
+  .toggle label { cursor: pointer; }
+
+  /* Поля на всю ширину: кнопка прижата к правому краю, а рядом с ней слева
+     то, что инструмент только что ответил. Полоса тянется в отступы .inner
+     отрицательными полями, иначе под ней просвечивал бы прокручиваемый текст. */
+  .bar {
+    position: sticky; bottom: 0; z-index: 5;
+    margin: 8px -28px 0; padding: 14px 28px 18px;
+    background: var(--bg); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  }
+  .bar .said { font-size: var(--t-sm); color: var(--fg-muted); }
+  .bar .said.ok { color: var(--brand); }
+  .bar .said.bad { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="wrap">
+    <div class="inner">
+      <div class="head">
+        <h1 data-i18n="setup.pageTitle">Настройка проекта</h1>
+        <div class="path" id="root"></div>
+      </div>
+
+      <section>
+        <h2 data-i18n="setup.rootsTitle">Что попадает в карту</h2>
+        <p class="why" data-i18n="setup.rootsWhy"></p>
+        <div class="tree" id="tree"></div>
+      </section>
+
+      <section>
+        <h2 data-i18n="setup.excludeTitle">Что пропускать дополнительно</h2>
+        <p class="why" data-i18n="setup.excludeWhy"></p>
+        <textarea id="exclude" spellcheck="false" data-i18n-placeholder="setup.excludePlaceholder"></textarea>
+      </section>
+
+      <section>
+        <h2 data-i18n="setup.placesTitle">Где что лежит</h2>
+        <div class="pair">
+          <div class="field">
+            <label for="docsDir" data-i18n="setup.docsDir">Каталог документов</label>
+            <input type="text" id="docsDir" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="model" data-i18n="setup.model">Модель для черновиков</label>
+            <input type="text" id="model" spellcheck="false">
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 data-i18n="setup.studioTitle">Студия</h2>
+        <p class="why" data-i18n="setup.studioWhy"></p>
+        <div class="toggle">
+          <input class="check" type="checkbox" id="autoStart">
+          <label for="autoStart" data-i18n="setup.autoStart">Поднимать вместе с сессией</label>
+        </div>
+        <div class="field" style="max-width: 220px">
+          <label for="idleMinutes" data-i18n="setup.idle">Гасить после простоя, минут</label>
+          <input type="number" id="idleMinutes" min="0" step="5">
+        </div>
+      </section>
+
+      <div class="bar">
+        <span class="said" id="said"></span>
+        <button class="btn btn-primary" id="save" data-i18n="setup.save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { esc } from '/shared.js'
+  import { initLang, applyI18n, t } from '/i18n.js'
+
+  initLang()
+  applyI18n()
+
+  const el = (id) => document.getElementById(id)
+  const said = el('said')
+
+  function tell(text, kind) {
+    said.textContent = text
+    said.className = `said ${kind ?? ''}`
+  }
+
+  function drawTree(tree, roots) {
+    const chosen = new Set(roots)
+    el('tree').innerHTML = tree
+      .map(
+        (entry) => `
+        <label class="${entry.depth > 1 ? 'nested' : ''}">
+          <input class="check" type="checkbox" value="${esc(entry.path)}" ${chosen.has(entry.path) ? 'checked' : ''}>
+          <span class="name">${esc(entry.path)}</span>
+          <span class="count">${entry.files}</span>
+        </label>`,
+      )
+      .join('')
+  }
+
+  // Родитель и его подкаталог вместе бессмысленны: родитель и так включает
+  // всё под собой, а две отметки потом читаются как противоречие.
+  function untangle(box) {
+    const all = [...document.querySelectorAll('#tree input')]
+    if (!box.checked) return
+    for (const other of all) {
+      if (other === box) continue
+      const inside = other.value.startsWith(`${box.value}/`) || box.value.startsWith(`${other.value}/`)
+      if (inside) other.checked = false
+    }
+  }
+
+  document.getElementById('tree').addEventListener('change', (e) => {
+    if (e.target.matches('input[type=checkbox]')) untangle(e.target)
+  })
+
+  function fill(view) {
+    el('root').textContent = view.root
+    drawTree(view.tree, view.config.roots)
+    el('exclude').value = view.config.exclude.join('\n')
+    el('docsDir').value = view.config.docsDir
+    el('model').value = view.config.model
+    el('autoStart').checked = view.config.studio.autoStart
+    el('idleMinutes').value = String(view.config.studio.idleMinutes)
+  }
+
+  function collect() {
+    return {
+      roots: [...document.querySelectorAll('#tree input:checked')].map((i) => i.value),
+      exclude: el('exclude').value.split('\n').map((s) => s.trim()).filter(Boolean),
+      docsDir: el('docsDir').value.trim(),
+      model: el('model').value.trim(),
+      studio: {
+        autoStart: el('autoStart').checked,
+        idleMinutes: Number(el('idleMinutes').value),
+      },
+    }
+  }
+
+  el('save').addEventListener('click', async () => {
+    tell(t('setup.saving'))
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(collect()),
+      })
+      if (!res.ok) throw new Error(String(res.status))
+      const { config } = await res.json()
+      el('model').value = config.model
+      el('docsDir').value = config.docsDir
+      // Про скан говорим прямо: без него настройки на карту не повлияют, а
+      // человек решит, что ничего не применилось.
+      tell(t('setup.saved'), 'ok')
+    } catch (error) {
+      tell(t('setup.saveFailed', { why: error.message }), 'bad')
+    }
+  })
+
+  try {
+    fill(await (await fetch('/api/config')).json())
+  } catch (error) {
+    tell(t('setup.loadFailed', { why: error.message }), 'bad')
+  }
+</script>
+</body>
+</html>

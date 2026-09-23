@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23121212'/%3E%3Cpath d='M7 15h10M12 15V9' stroke='%233ecf8e' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='7' r='2' fill='%233ecf8e'/%3E%3C/svg%3E">
+<title data-i18n="guide.pageTitle">Справочник D2</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .page { display: grid; grid-template-columns: 248px 1fr; height: 100%; }
+
+  .side {
+    border-right: 1px solid var(--border); background: var(--surface);
+    display: grid; grid-template-rows: auto 1fr auto; overflow: hidden;
+  }
+  .side .top { padding: 16px 16px 10px; }
+  .toc { overflow-y: auto; padding: 0 10px 16px; }
+  .toc a {
+    display: block; padding: 7px 10px; border-radius: var(--radius);
+    color: var(--fg-muted); font-size: var(--t-sm); text-decoration: none;
+    border-left: 2px solid transparent; transition: color .12s, background .12s;
+  }
+  .toc a:hover { color: var(--fg); background: var(--card-hover); }
+  .toc a.on { color: var(--fg); background: var(--card-hover); border-left-color: var(--brand); }
+  .side .bottom { padding: 12px 16px; border-top: 1px solid var(--border); display: grid; gap: 6px; }
+  .side .bottom a.btn { text-decoration: none; }
+
+  /* Место под полосу прокрутки резервируется с обеих сторон, иначе колонка
+     стоит не по центру ровно на её ширину. */
+  .body { overflow-y: auto; scrollbar-gutter: stable both-edges; }
+  .inner { max-width: 880px; margin: 0 auto; padding: 34px 40px 120px; }
+
+  .lead h1 { margin: 0 0 8px; font-size: var(--t-2xl); font-weight: 600; letter-spacing: -.02em; }
+  .lead p { margin: 0 0 34px; color: var(--fg-muted); font-size: var(--t-md); max-width: 62ch; }
+
+  section { padding-top: 28px; margin-bottom: 14px; scroll-margin-top: 20px; }
+  section > h2 {
+    margin: 0 0 14px; font-size: var(--t-xl); font-weight: 600; letter-spacing: -.015em;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  section p { margin: 0 0 14px; max-width: 68ch; line-height: 1.65; color: var(--fg-muted); }
+  section ul { margin: 0 0 14px; padding-left: 18px; max-width: 68ch; }
+  section li { margin-bottom: 6px; line-height: 1.6; color: var(--fg-muted); }
+
+  .warn {
+    display: flex; gap: 10px; padding: 11px 13px; margin: 0 0 16px; max-width: 68ch;
+    background: var(--amber-dim); border: 1px solid rgba(245, 166, 35, 0.28);
+    border-radius: var(--radius); color: var(--fg); font-size: var(--t-sm); line-height: 1.55;
+  }
+  .warn .icon { color: var(--amber); flex: none; margin-top: 1px; }
+
+  .snippet {
+    position: relative; margin: 0 0 18px;
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    background: var(--card); overflow: hidden;
+  }
+  .snippet pre {
+    margin: 0; padding: 14px 16px; overflow-x: auto;
+    font-family: var(--mono); font-size: var(--t-sm); line-height: 1.7; color: var(--fg);
+  }
+  .snippet .copy { position: absolute; right: 8px; top: 8px; opacity: 0; transition: opacity .12s; }
+  .snippet:hover .copy { opacity: 1; }
+  .snippet .copy.done { opacity: 1; color: var(--brand); }
+
+  .demo { margin: 0 0 22px; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .demo .snippet { margin: 0; border: 0; border-radius: 0; border-bottom: 1px solid var(--border); }
+  /* Место под схему занято заранее и меняется плавно: иначе появление
+     картинки сдвигает вниз всё, что человек в этот момент читает. */
+  .demo .out {
+    position: relative; background: var(--bg); padding: 18px;
+    height: 240px; overflow: hidden; transition: height .3s cubic-bezier(.4, 0, .2, 1);
+  }
+  .demo .out.done { height: auto; }
+  /* Схема вписывается в карточку примера: иначе высокий пример занимает
+     весь экран и следующий раздел приходится искать прокруткой. */
+  .demo .out svg { display: block; max-width: 100%; max-height: 380px; width: auto; height: auto; margin: 0 auto; }
+  .demo .cap {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; background: var(--surface); border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: var(--t-2xs); letter-spacing: .08em;
+    text-transform: uppercase; color: var(--fg-subtle);
+  }
+  .demo .wait { position: absolute; inset: 0; display: grid; place-items: center; }
+  .demo .state { color: var(--fg-subtle); font-size: var(--t-sm); font-family: var(--mono); }
+  .demo .state.bad { color: var(--red); }
+
+  .roles { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: var(--t-sm); }
+  .roles th {
+    text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: var(--t-2xs); letter-spacing: .1em;
+    text-transform: uppercase; color: var(--fg-subtle); font-weight: 400;
+  }
+  .roles td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .roles tr:hover td { background: var(--surface); }
+  .roles .name { font-family: var(--mono); color: var(--fg); white-space: nowrap; }
+  .roles .shape { font-family: var(--mono); color: var(--fg-subtle); white-space: nowrap; }
+  .roles .when { color: var(--fg-muted); line-height: 1.5; }
+  .roles .sw { display: inline-block; width: 15px; height: 12px; border-radius: 3px; border: 1.5px solid; margin-right: 8px; vertical-align: -1px; }
+  .roles .ln { display: inline-block; width: 15px; height: 2px; border-radius: 1px; margin-right: 8px; vertical-align: 4px; }
+  .roles .group td {
+    font-family: var(--mono); font-size: var(--t-2xs); letter-spacing: .1em;
+    text-transform: uppercase; color: var(--fg-subtle); padding-top: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="page">
+    <div class="side">
+      <div class="top">
+        <a class="brand" href="/" id="brand"></a>
+        <div class="section-label" style="margin-top:18px" id="lblToc"></div>
+      </div>
+      <nav class="toc" id="toc"></nav>
+      <div class="bottom">
+        <div id="selLang"></div>
+        <a class="btn btn-block" href="/" id="toLibrary"></a>
+      </div>
+    </div>
+
+    <div class="body" id="body">
+      <div class="inner">
+        <div class="lead">
+          <h1 data-i18n="guide.title"></h1>
+          <p data-i18n="guide.lead"></p>
+        </div>
+        <div id="sections"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { icon } from '/icons.js'
+import { createSelect } from '/ui.js'
+import { esc } from '/shared.js'
+import { highlightD2 } from '/editor.js'
+import { initLang, applyI18n, t, LANGS, currentLang, setLang } from '/i18n.js'
+import { guideSections } from '/guide-content.js'
+
+const $ = (id) => document.getElementById(id)
+
+initLang()
+applyI18n()
+
+$('brand').innerHTML =
+  `<span class="mark">${icon('network', 'icon')}</span>` +
+  `<span><b>${esc(t('app.name'))}</b><br><em>${esc(t('app.tag'))}</em></span>`
+$('lblToc').innerHTML = icon('book', 'icon icon-sm') + `<span>${esc(t('guide.contents'))}</span>`
+$('toLibrary').innerHTML = icon('arrow-left', 'icon icon-sm') + `<span>${esc(t('nav.library'))}</span>`
+
+createSelect($('selLang'), {
+  value: currentLang(),
+  options: LANGS.map((l) => ({ value: l.code, label: l.label })),
+  onChange: setLang,
+})
+
+const sections = guideSections(currentLang())
+
+$('toc').innerHTML = sections
+  .map((s) => `<a href="#${s.id}" data-id="${s.id}">${esc(s.title)}</a>`)
+  .join('')
+
+const snippet = (code) => `
+  <div class="snippet">
+    <button class="btn btn-icon btn-ghost copy" data-code="${esc(code)}" title="${esc(t('action.copy'))}">
+      ${icon('copy', 'icon icon-sm')}
+    </button>
+    <pre><code>${highlightD2(code)}</code></pre>
+  </div>`
+
+const block = (b) => {
+  if (b.t === 'text') return `<p>${esc(b.text)}</p>`
+  if (b.t === 'list') return `<ul>${b.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`
+  if (b.t === 'warn') return `<div class="warn">${icon('alert', 'icon icon-sm')}<div>${esc(b.text)}</div></div>`
+  if (b.t === 'code') return snippet(b.code)
+  if (b.t === 'roles') {
+    return `<div class="roles-slot">${
+      Array.from({ length: 6 }, () =>
+        '<div class="skel skel-line" style="width:100%;height:30px;margin-bottom:6px"></div>').join('')
+    }</div>`
+  }
+  if (b.t === 'example') {
+    return `
+      <div class="demo" data-code="${esc(b.code)}">
+        ${snippet(b.code)}
+        <div class="cap">${icon('layers', 'icon icon-sm')}<span>${esc(t('guide.result'))}</span></div>
+        <div class="out"><div class="wait"><span class="spinner"></span></div></div>
+      </div>`
+  }
+  return ''
+}
+
+$('sections').innerHTML = sections
+  .map((s) => `<section id="${s.id}"><h2>${esc(s.title)}</h2>${s.blocks.map(block).join('')}</section>`)
+  .join('')
+
+/* Копирование кода примера. Буфер обмена доступен не всегда, поэтому есть
+   запасной путь через скрытое поле. */
+for (const btn of document.querySelectorAll('.copy')) {
+  btn.addEventListener('click', async () => {
+    const code = btn.dataset.code
+    try {
+      await navigator.clipboard.writeText(code)
+    } catch {
+      const box = document.createElement('textarea')
+      box.value = code
+      box.style.cssText = 'position:fixed;opacity:0'
+      document.body.append(box)
+      box.select()
+      document.execCommand('copy')
+      box.remove()
+    }
+    btn.classList.add('done')
+    btn.innerHTML = icon('check', 'icon icon-sm')
+    setTimeout(() => {
+      btn.classList.remove('done')
+      btn.innerHTML = icon('copy', 'icon icon-sm')
+    }, 1200)
+  })
+}
+
+/* Таблица ролей собирается из палитры проекта, а не из текста справочника:
+   иначе она разойдётся с палитрой при первой же правке. */
+async function fillRoles() {
+  const slots = document.querySelectorAll('.roles-slot')
+  if (slots.length === 0) return
+
+  const palette = await (await fetch('/api/palette')).json()
+  const roles = palette.classes.filter((c) => c.hint)
+  const groups = [...new Set(roles.map((c) => c.group))]
+
+  const mark = (c) =>
+    c.group === 'Связи'
+      ? `<span class="ln" style="background:${esc(c.stroke || 'var(--fg-subtle)')}"></span>`
+      : `<span class="sw" style="border-color:${esc(c.stroke || 'var(--fg-subtle)')};background:${esc(c.fill || 'transparent')}"></span>`
+
+  const html = `
+    <table class="roles">
+      <thead><tr>
+        <th>${esc(t('guide.roleName'))}</th>
+        <th>${esc(t('guide.roleShape'))}</th>
+        <th>${esc(t('guide.roleWhen'))}</th>
+      </tr></thead>
+      <tbody>
+        ${groups.map((g) => `
+          <tr class="group"><td colspan="3">${esc(g)}</td></tr>
+          ${roles.filter((c) => c.group === g).map((c) => `
+            <tr>
+              <td class="name">${mark(c)}${esc(c.name)}</td>
+              <td class="shape">${c.group === 'Связи' ? '' : esc(c.shape)}</td>
+              <td class="when">${esc(c.hint)}</td>
+            </tr>`).join('')}`).join('')}
+      </tbody>
+    </table>`
+
+  for (const slot of slots) { slot.innerHTML = html; slot.classList.add('appear') }
+}
+
+/* Примеры рисуются не все сразу, а когда доезжают до экрана: каждый это
+   отдельная сборка d2, и восемь штук на загрузке тормозили бы страницу. */
+function drawExamples() {
+  const seen = new WeakSet()
+
+  const draw = async (demo) => {
+    if (seen.has(demo)) return
+    seen.add(demo)
+    const out = demo.querySelector('.out')
+    const res = await fetch('/api/render', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ source: demo.dataset.code, layout: 'dagre', appearance: 'dark' }),
+    })
+    const result = await res.json()
+    if (!result.ok) {
+      out.innerHTML = `<div class="wait"><span class="state bad">${esc(t('guide.failed'))}</span></div>`
+      return
+    }
+    out.innerHTML = result.svg
+    const svg = out.querySelector('svg')
+    if (!svg) return
+    svg.classList.add('appear')
+    // D2 подкладывает под схему сплошной прямоугольник во всю величину,
+    // на своём фоне он выглядит вставленной картинкой.
+    const box = (svg.getAttribute('viewBox') ?? '').split(/[\s,]+/).map(Number)
+    if (box.length === 4) {
+      svg.setAttribute('width', String(box[2]))
+      svg.setAttribute('height', String(box[3]))
+      for (const rect of svg.querySelectorAll('rect')) {
+        if (Math.abs(rect.width.baseVal.value - box[2]) < 2 && Math.abs(rect.height.baseVal.value - box[3]) < 2) {
+          rect.remove()
+          break
+        }
+      }
+    }
+
+    // Высота едет от заглушки к настоящей, а не прыгает. После перехода
+    // ограничение снимается, чтобы схема могла меняться дальше сама.
+    const release = () => {
+      out.classList.add('done')
+      out.style.height = ''
+    }
+    const target = Math.round(svg.getBoundingClientRect().height + 36)
+    // Совпадение с высотой заглушки не запустило бы переход, и блок остался
+    // бы навсегда обрезанным по ней.
+    if (Math.abs(target - out.getBoundingClientRect().height) < 1) return release()
+
+    requestAnimationFrame(() => {
+      out.style.height = `${target}px`
+      out.addEventListener('transitionend', release, { once: true })
+    })
+  }
+
+  const watcher = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) draw(e.target)
+  }, { root: $('body'), rootMargin: '300px' })
+
+  const all = [...document.querySelectorAll('.demo')]
+  for (const demo of all) watcher.observe(demo)
+
+  // Наблюдатель пропускает то, мимо чего пролетели рывком: при быстрой
+  // прокрутке или переходе по оглавлению он не успевает отчитаться. Поэтому
+  // через паузу идёт добор остальных по одному, чтобы не занять сборщик d2.
+  setTimeout(async () => {
+    for (const demo of all) await draw(demo)
+  }, 1200)
+}
+
+/* Подсветка текущего раздела в оглавлении. Берётся верхний из видимых, иначе
+   при быстрой прокрутке подсвечиваются сразу несколько. */
+function trackToc() {
+  const links = new Map([...$('toc').children].map((a) => [a.dataset.id, a]))
+  const visible = new Set()
+
+  const watcher = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) visible.add(e.target.id)
+      else visible.delete(e.target.id)
+    }
+    const first = sections.find((s) => visible.has(s.id))
+    for (const [id, a] of links) a.classList.toggle('on', id === first?.id)
+  }, { root: $('body'), rootMargin: '-10% 0px -70% 0px' })
+
+  for (const s of document.querySelectorAll('section')) watcher.observe(s)
+}
+
+fillRoles()
+drawExamples()
+trackToc()
+</script>
+</body>
+</html>

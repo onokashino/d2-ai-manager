@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23121212'/%3E%3Cpath d='M7 15h10M12 15V9' stroke='%233ecf8e' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='7' r='2' fill='%233ecf8e'/%3E%3C/svg%3E">
+<title data-i18n="doc.pageTitle">Документ логики</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .page { display: grid; grid-template-rows: 48px 1fr; height: 100%; }
+  .bar {
+    display: flex; align-items: center; gap: 10px; padding: 0 12px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .bar a.btn { text-decoration: none; }
+  .bar .doc-title { font-size: var(--t-md); font-weight: 550; letter-spacing: -.01em; }
+  .bar .doc-path { font-family: var(--mono); font-size: var(--t-xs); color: var(--fg-subtle); }
+  .bar .sep { width: 1px; height: 20px; background: var(--border); }
+  .bar .spacer { margin-left: auto; }
+  .bar .select { width: 130px; }
+
+  .state {
+    font-family: var(--mono); font-size: var(--t-xs); color: var(--fg-subtle);
+    display: inline-flex; align-items: center; gap: 5px; min-width: 96px;
+  }
+  .state.live { color: var(--brand); }
+  .state.bad { color: var(--red); }
+  .state .pulse { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .state.busy .pulse { animation: blink .8s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  .panes { display: grid; grid-template-columns: 1fr 460px; overflow: hidden; }
+  .side { border-left: 1px solid var(--border); background: var(--surface); display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 6px; }
+  .tab {
+    display: flex; align-items: center; gap: 6px; padding: 10px 12px; cursor: pointer;
+    color: var(--fg-subtle); font-size: var(--t-sm); font-weight: 500;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .12s;
+  }
+  .tab:hover { color: var(--fg-muted); }
+  .tab.on { color: var(--fg); border-bottom-color: var(--brand); }
+  .props { padding: 16px; overflow-y: auto; }
+  .anchor-row {
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px; margin-bottom: 5px;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    font-family: var(--mono); font-size: var(--t-xs);
+  }
+  .anchor-row .state2 { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: var(--t-2xs); white-space: nowrap; }
+  .anchor-row .state2.ok { color: var(--brand); }
+  .anchor-row .state2.bad { color: var(--red); }
+  /* Переписанный код это не сломанный якорь, а повод перечитать документ. */
+  .anchor-row .state2.warn { color: var(--amber); }
+  .field-note.ok { color: var(--brand); }
+  .field-note.warn { color: var(--amber); }
+  .errors { border-top: 1px solid var(--border); padding: 10px 14px; max-height: 150px; overflow-y: auto; background: var(--card); }
+  .errors:empty { display: none; }
+  .err-line {
+    display: flex; gap: 8px; color: var(--red); font-family: var(--mono);
+    font-size: var(--t-xs); margin-bottom: 5px; cursor: pointer;
+  }
+  .err-line:hover { text-decoration: underline; }
+  .err-line b { color: var(--fg-muted); font-weight: 500; }
+
+  /* Полоса досок: шаги, ветки и слои одного документа. Появляется только у
+     документов, где они есть, поэтому обычную схему ничем не загромождает. */
+  .boards {
+    position: absolute; left: 50%; transform: translateX(-50%); top: 14px; z-index: 20;
+    display: flex; align-items: center; gap: 2px; padding: 4px;
+    background: var(--overlay); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow); max-width: 70%;
+  }
+  .boards[hidden] { display: none; }
+  .board-list { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+  .board-list::-webkit-scrollbar { display: none; }
+  .board {
+    display: flex; align-items: center; gap: 5px; white-space: nowrap;
+    padding: 4px 9px; border-radius: var(--radius); cursor: pointer;
+    font-size: var(--t-sm); color: var(--fg-muted); transition: background .12s, color .12s;
+  }
+  .board:hover { background: var(--card-hover); color: var(--fg); }
+  .board.on { background: var(--brand-dim); color: var(--brand); }
+  .board .kind {
+    font-family: var(--mono); font-size: var(--t-2xs); color: var(--fg-subtle);
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+  .board.on .kind { color: var(--brand); }
+
+  /* Ожидание первой сборки схемы. Крутилка лежит поверх полотна, поэтому
+     появление диаграммы ничего не двигает. */
+  .stage-wait {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    pointer-events: none; transition: opacity .2s ease;
+  }
+  .stage-wait[hidden] { display: none; }
+
+  /* Полосы вместо кода, пока едут документ и палитра. */
+  .editor-wait { position: relative; display: grid; align-content: start; gap: 11px; padding: 14px 16px 0 60px; }
+  .editor-wait::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 44px;
+    background: var(--surface); border-right: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+<div class="page">
+  <div class="bar">
+    <a class="btn" href="/" id="back"></a>
+    <span class="sep"></span>
+    <span class="doc-title" id="etitle"><span class="skel skel-line" style="width:150px;display:inline-block"></span></span>
+    <span class="doc-path" id="epath"><span class="skel skel-line" style="width:180px;display:inline-block"></span></span>
+    <span class="state" id="state"></span>
+    <span class="spacer"></span>
+    <div id="selStatus"><div class="skel skel-box" style="width:130px"></div></div>
+    <div id="selLayout"><div class="skel skel-box" style="width:130px"></div></div>
+    <button class="btn" id="econfirm" data-i18n-title="doc.confirmHint"></button>
+    <button class="btn btn-icon" id="esvg" data-i18n-title="action.downloadSvg"></button>
+    <button class="btn btn-primary" id="esave"></button>
+  </div>
+
+  <div class="panes">
+    <div class="viewer" id="viewport">
+      <div class="viewer-stage" id="stage"></div>
+      <div class="stage-wait" id="stageWait"><span class="spinner"></span></div>
+
+      <div class="boards" id="boards" data-overlay hidden>
+        <button class="btn btn-icon btn-ghost" id="boardPrev" data-i18n-title="doc.boardPrev"></button>
+        <div class="board-list" id="boardList"></div>
+        <button class="btn btn-icon btn-ghost" id="boardNext" data-i18n-title="doc.boardNext"></button>
+      </div>
+
+      <div class="legend" id="legend" data-overlay>
+        <div class="legend-head" id="legendHead"></div>
+        <div class="legend-body" id="legendBody"></div>
+      </div>
+
+      <div class="viewer-zoom" id="zoomLabel" data-overlay>100%</div>
+      <div class="viewer-tools" data-overlay>
+        <button class="btn btn-icon btn-ghost" id="zin" data-i18n-title="action.zoomIn"></button>
+        <button class="btn btn-icon btn-ghost" id="zout" data-i18n-title="action.zoomOut"></button>
+        <button class="btn btn-icon btn-ghost" id="zfit" data-i18n-title="action.fit"></button>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="tabs">
+        <div class="tab on" data-tab="code" id="tabCode"></div>
+        <div class="tab" data-tab="props" id="tabProps"></div>
+      </div>
+      <div id="pane-code" style="overflow:hidden"><div id="editor" class="editor-wait"></div></div>
+      <div id="pane-props" class="props" style="display:none">
+        <label class="field-label" data-i18n="doc.fieldTitle"></label><input id="ptitle" class="input">
+        <label class="field-label" style="margin-top:14px" data-i18n="doc.fieldArea"></label><input id="parea" class="input">
+        <label class="field-label" style="margin-top:14px" data-i18n="doc.fieldSummary"></label>
+        <textarea id="psummary" class="input input-area" rows="3"
+          data-i18n-placeholder="doc.summaryPlaceholder"></textarea>
+        <div class="field-note" data-i18n="doc.summaryHint"></div>
+        <div class="field-note" id="checkedBy"></div>
+        <div class="section-label" style="margin-top:20px" id="lblAnchors"></div>
+        <div id="panchors"></div>
+        <div class="section-label" style="margin-top:20px" id="lblFlow" hidden></div>
+        <div id="pflow"></div>
+      </div>
+      <div class="errors" id="errors"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="role-tip" id="roleTip" hidden></div>
+
+<script type="module">
+import { icon } from '/icons.js'
+import { createSelect, createZoomer, sizeSvgFromViewBox, attachTip } from '/ui.js'
+import { createEditor } from '/editor.js'
+import { STATUS_DOT, STATUS_LIST, esc, remembered, remember } from '/shared.js'
+import { initLang, applyI18n, t } from '/i18n.js'
+
+const $ = (id) => document.getElementById(id)
+
+initLang()
+applyI18n()
+
+const docPath = decodeURIComponent(location.pathname.replace(/^\/d\//, ''))
+
+let current = null
+let zoomer = null
+let editor = null
+let statusSelect = null
+let layoutSelect = null
+
+/* Движок раскладки переживает перезагрузку: выбор между dagre и elk человек
+   делает под конкретную схему и не хочет возвращать его каждый раз. */
+const LAYOUT_KEY = 'aimd2-layout'
+const LAYOUTS = ['dagre', 'elk']
+let layout = remembered(LAYOUT_KEY, LAYOUTS, 'dagre')
+let palette = { classes: [], shapes: [], keywords: [] }
+let saved = ''
+let renderTimer = null
+let renderToken = 0
+
+$('back').innerHTML = icon('arrow-left', 'icon icon-sm') + `<span>${esc(t('nav.library'))}</span>`
+$('esvg').innerHTML = icon('download', 'icon icon-sm')
+$('esave').innerHTML = icon('save', 'icon icon-sm') + `<span>${esc(t('action.save'))}</span>`
+$('econfirm').innerHTML = icon('check', 'icon icon-sm') + `<span>${esc(t('doc.confirm'))}</span>`
+$('boardPrev').innerHTML = icon('arrow-left', 'icon icon-sm')
+$('boardNext').innerHTML = icon('arrow-left', 'icon icon-sm')
+$('boardNext').firstElementChild.style.transform = 'rotate(180deg)'
+$('zin').innerHTML = icon('plus', 'icon icon-sm')
+$('zout').innerHTML = icon('minus', 'icon icon-sm')
+$('zfit').innerHTML = icon('maximize', 'icon icon-sm')
+$('tabCode').innerHTML = icon('code', 'icon icon-sm') + `<span>${esc(t('doc.tabCode'))}</span>`
+$('tabProps').innerHTML = icon('sliders', 'icon icon-sm') + `<span>${esc(t('doc.tabProps'))}</span>`
+$('lblAnchors').innerHTML = icon('anchor', 'icon icon-sm') + `<span>${esc(t('doc.anchors'))}</span>`
+$('lblFlow').innerHTML = icon('git-branch', 'icon icon-sm') + `<span>${esc(t('doc.flow'))}</span>`
+$('legendHead').innerHTML =
+  icon('book', 'icon icon-sm') + `<span>${esc(t('doc.legend'))}</span>` + icon('chevron-down', 'icon icon-sm')
+
+/* Поле описания растёт под текст: заранее угаданная высота либо режет конец,
+   либо оставляет пустоту. Выше потолка включается своя прокрутка. */
+function fitArea(el, limit = 280) {
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight + 2, limit)}px`
+}
+$('psummary').addEventListener('input', () => fitArea($('psummary')))
+
+/* Полосы вместо кода и якорей, пока едут документ и палитра. Ширины разные,
+   иначе заглушка выглядит таблицей, а не текстом. */
+function drawWaiting() {
+  const widths = [32, 0, 22, 64, 58, 61, 55, 0, 44, 48, 52, 39, 0, 36, 41]
+  $('editor').innerHTML = widths
+    .map((w) => (w === 0 ? '<div style="height:10px"></div>' : `<div class="skel skel-line" style="width:${w}%"></div>`))
+    .join('')
+
+  $('panchors').innerHTML = Array.from({ length: 3 }, () =>
+    '<div class="anchor-row"><span class="skel skel-line" style="width:70%"></span></div>').join('')
+}
+
+function setState(kind, text) {
+  $('state').className = `state ${kind}`
+  $('state').innerHTML = text ? `<span class="pulse"></span><span>${esc(text)}</span>` : ''
+}
+
+/* Легенда собирается из палитры, поэтому список ролей всегда актуален. */
+function drawLegend() {
+  const roles = palette.classes.filter((c) => c.hint)
+  const groups = [...new Set(roles.map((c) => c.group))]
+
+  $('legendBody').innerHTML = groups.map((g) => `
+      <div class="legend-group">${esc(g)}</div>
+      ${roles.filter((c) => c.group === g).map((c) => swatchRow(c, g)).join('')}`)
+    .join('')
+}
+
+function swatchRow(c, group) {
+  // У связи нет заливки: образцом служит линия её цвета, иначе прямоугольник
+  // обещал бы узел там, где на схеме будет стрелка.
+  const mark = group === 'Связи'
+    ? `<span class="legend-line" style="background:${esc(c.stroke || 'var(--fg-subtle)')}"></span>`
+    : `<span class="legend-swatch" style="border-color:${esc(c.stroke || 'var(--fg-subtle)')};background:${esc(c.fill || 'transparent')}"></span>`
+
+  return `<div class="legend-item" data-class="${esc(c.name)}">
+      ${mark}
+      <span class="legend-name">${esc(c.name)}</span>
+      <span class="legend-hint">${esc(c.hint)}</span>
+    </div>`
+}
+
+// Наведение раскрывает легенду, клик закрепляет: так она не схлопывается,
+// пока по ней водят глазами и сравнивают с диаграммой.
+$('legendHead').addEventListener('click', () => $('legend').classList.toggle('pinned'))
+
+const litLegend = (name) => {
+  for (const el of $('legendBody').children) el.classList.toggle('lit', el.dataset.class === name)
+}
+
+/* Ссылки на узлах. D2 оборачивает узел в <a href> и рисует рядом значок, но
+   ссылка на доску у него выглядит как root.layers.имя, то есть адресом не
+   является: браузер по ней уходит в никуда. Перехватываем сами.
+
+   Заодно вешаем на значок подпись: своего пояснения D2 ему не даёт, и до сих
+   пор человек видел значок, по которому непонятно, куда он ведёт. */
+/** Значок без своей подписи, ближайший к правому верхнему углу узла. */
+function nearestBadge(anchor) {
+  const box = anchor.getBoundingClientRect()
+  let best = null
+  let near = Infinity
+
+  for (const badge of $('stage').querySelectorAll('g.appendix-icon')) {
+    if (badge.dataset.tip) continue
+    const at = badge.getBoundingClientRect()
+    const away = Math.hypot(at.left - box.right, at.top - box.top)
+    if (away < near) {
+      near = away
+      best = badge
+    }
+  }
+  // Порог против чужого значка: у узла без ссылки его просто нет, и ближайшим
+  // оказался бы соседский.
+  return near <= 80 ? best : null
+}
+
+function wireLinks() {
+  const known = new Map(boards.map((b) => [b.target, b]))
+
+  for (const anchor of $('stage').querySelectorAll('a[href]')) {
+    const href = anchor.getAttribute('href') ?? ''
+    const inner = href.startsWith('root.') ? href.slice('root.'.length) : ''
+    const target = known.get(inner)
+    const where = inner || href
+
+    // Значок лежит не внутри ссылки, а рядом с ней: D2 кладёт их братьями.
+    // Поэтому ищем ближайший к правому верхнему углу узла, где он и рисуется.
+    const badge = nearestBadge(anchor)
+    const text =
+      target ? t('doc.linkBoard', { name: target.name })
+      : inner ? t('doc.linkGone', { where })
+      : t('doc.linkDoc', { where })
+    if (badge) attachTip($('stage'), badge, text)
+
+    anchor.addEventListener('click', (e) => {
+      // Ссылка внутрь документа это не переход по адресу, а смена доски.
+      if (!inner) return
+      e.preventDefault()
+      if (!target || target.target === board) return
+      board = target.target
+      render(false)
+    })
+  }
+}
+
+/* Подсказка о роли: d2 записывает имя нашего класса прямо в группу узла,
+   поэтому роль узнаётся без сопоставления по подписи. */
+function wireRoleTips() {
+  const byName = new Map(palette.classes.map((c) => [c.name, c]))
+  const tip = $('roleTip')
+
+  for (const group of $('stage').querySelectorAll('g[class]')) {
+    const found = [...group.classList].find((c) => byName.has(c))
+    if (!found) continue
+    const role = byName.get(found)
+
+    group.style.cursor = 'help'
+    group.addEventListener('mouseenter', () => {
+      // У узла есть своё объяснение: оно важнее справки о роли, и две
+      // всплывашки друг на друге читаются хуже, чем одна.
+      if (group.dataset.tip) return litLegend(role.name)
+
+      tip.innerHTML = `
+        <div class="role-name">
+          <span class="swatch" style="background:${esc(role.stroke || 'var(--fg-subtle)')}"></span>
+          ${esc(role.name)}
+          <span style="color:var(--fg-subtle);font-size:var(--t-2xs)">${esc(role.shape)}</span>
+        </div>
+        <div class="role-text">${esc(role.hint)}</div>`
+      tip.hidden = false
+      litLegend(role.name)
+    })
+    group.addEventListener('mousemove', (e) => {
+      // Подсказка держится у курсора и не вылезает за правый край окна.
+      const width = tip.offsetWidth
+      tip.style.left = `${Math.min(e.clientX + 14, window.innerWidth - width - 12)}px`
+      tip.style.top = `${e.clientY + 16}px`
+    })
+    group.addEventListener('mouseleave', () => { tip.hidden = true; litLegend(null) })
+  }
+}
+
+/* Доски документа и выбранная сейчас. Выбор живёт в памяти страницы, а не в
+   адресе: он теряет смысл, как только документ переписали. */
+let boards = []
+let board = ''
+
+function drawBoards() {
+  const strip = $('boards')
+  // У обычной схемы досок нет, и полоса не должна занимать место над полотном.
+  strip.hidden = boards.length === 0
+  if (strip.hidden) return
+
+  const all = [{ kind: '', name: t('doc.boardRoot'), target: '' }, ...boards]
+  $('boardList').innerHTML = all
+    .map((b) => `
+      <div class="board ${b.target === board ? 'on' : ''}" data-target="${esc(b.target)}">
+        ${b.kind ? `<span class="kind">${esc(t('doc.board.' + b.kind))}</span>` : ''}
+        <span>${esc(b.name)}</span>
+      </div>`)
+    .join('')
+
+  for (const el of $('boardList').querySelectorAll('.board')) {
+    el.addEventListener('click', () => {
+      if (el.dataset.target === board) return
+      board = el.dataset.target
+      render(false)
+    })
+  }
+  $('boardList').querySelector('.board.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+
+/** Шаг по доскам вперёд или назад: так их и читают, по порядку. */
+function stepBoard(delta) {
+  const all = ['', ...boards.map((b) => b.target)]
+  const at = all.indexOf(board)
+  const next = all[(at + delta + all.length) % all.length]
+  if (next === board) return
+  board = next
+  render(false)
+}
+
+function showRender(result, keepView) {
+  if (result.ok) {
+    $('stageWait').hidden = true
+    boards = result.boards ?? []
+    if (!boards.some((b) => b.target === board)) board = ''
+    drawBoards()
+    $('stage').innerHTML = result.svg || ''
+    sizeSvgFromViewBox($('stage'))
+    $('errors').innerHTML = ''
+    editor?.markErrors([])
+
+    if (!zoomer) {
+      zoomer = createZoomer($('viewport'), $('stage'))
+      $('viewport').addEventListener('zoomchange', (e) => {
+        $('zoomLabel').textContent = Math.round(e.detail.scale * 100) + '%'
+      })
+    }
+    wireRoleTips()
+    wireLinks()
+    // При живой перерисовке масштаб не сбрасывается: иначе диаграмма прыгает
+    // под руками на каждом набранном символе.
+    if (!keepView) requestAnimationFrame(() => zoomer.fit())
+    setState(dirty() ? 'live' : '', dirty() ? t('doc.stateUnsaved') : '')
+  } else {
+    $('stageWait').hidden = true
+    const lines = result.errors.map((e) => e.line).filter(Boolean)
+    editor?.markErrors(lines)
+    $('errors').innerHTML = result.errors
+      .map((e) => `<div class="err-line" data-line="${e.line}"><b>${e.line}:${e.column}</b><span>${esc(e.message)}</span></div>`)
+      .join('')
+    for (const el of $('errors').querySelectorAll('.err-line')) {
+      el.addEventListener('click', () => editor?.goToLine(Number(el.dataset.line)))
+    }
+    setState('bad', t('doc.stateErrors', { n: result.errors.length }))
+  }
+}
+
+const dirty = () => editor && editor.value !== saved
+
+async function render(keepView = true) {
+  const token = ++renderToken
+  setState('busy', t('doc.stateDrawing'))
+  const res = await fetch('/api/render', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ source: editor.value, layout, appearance: 'dark', target: board }),
+  })
+  const result = await res.json()
+  // Пока ждали ответ, мог уйти следующий запрос: старый результат не рисуем.
+  if (token !== renderToken) return
+  showRender(result, keepView)
+}
+
+function scheduleRender() {
+  clearTimeout(renderTimer)
+  setState('busy', t('doc.stateTyping'))
+  // Пауза в наборе, а не каждое нажатие: компиляция занимает десятки
+  // миллисекунд, и рисовать на каждую букву незачем.
+  renderTimer = setTimeout(() => render(true), 450)
+}
+
+const ANCHOR_REASON = {
+  'file-missing': 'doc.anchorNoFile',
+  'symbol-missing': 'doc.anchorNoSymbol',
+  drifted: 'doc.anchorDrifted',
+}
+
+/* Кто сверял документ. Видно сразу: документ, который агент и написал, и сам
+   объявил верным, иначе выглядит так же, как прочитанный человеком. */
+function drawChecked(by) {
+  const note = $('checkedBy')
+  note.className = `field-note ${by === 'human' ? 'ok' : 'warn'}`
+  note.textContent = by === 'human' ? t('doc.checkedHuman') : by === 'agent' ? t('doc.checkedAgent') : t('doc.checkedNever')
+}
+
+function drawAnchors(broken) {
+  $('panchors').innerHTML = current.anchors.length === 0
+    ? `<div class="anchor-row" style="color:var(--fg-subtle)">${esc(t('doc.noAnchors'))}</div>`
+    : current.anchors.map((a) => {
+        const bad = broken.find((b) => b.file === a.file && b.symbol === a.symbol)
+        return `<div class="anchor-row">
+          <span>${esc(a.file)}${a.symbol ? ':' + esc(a.symbol) : ''}</span>
+          <span class="state2 ${bad ? (bad.reason === 'drifted' ? 'warn' : 'bad') : 'ok'}">
+            ${icon(bad ? 'alert' : 'check', 'icon icon-sm')}
+            ${esc(bad ? t(ANCHOR_REASON[bad.reason]) : t('doc.anchorOk'))}
+          </span>
+        </div>`
+      }).join('')
+}
+
+/* Ход через код. Шаги показываются цепочкой, потому что порядок и есть то,
+   ради чего ход заводят, а рядом с каждым переходом видно, цел ли он.
+
+   Строгость у двух бед разная, и это не придирка: пропавший шаг это факт,
+   а невидимый переход только подозрение, потому что карта вызовов знает
+   вызовы по имени и не знает вызовов через точку. */
+function drawFlow(issues) {
+  const steps = current.flow ?? []
+  $('lblFlow').hidden = steps.length === 0
+  if (steps.length === 0) {
+    $('pflow').innerHTML = ''
+    return
+  }
+
+  const gone = new Set(issues.filter((i) => i.kind === 'step-missing').map((i) => `${i.step.file}:${i.step.symbol}`))
+  const broken = new Set(issues.filter((i) => i.kind === 'link-missing').map((i) => `${i.from.file}:${i.from.symbol}`))
+
+  $('pflow').innerHTML = steps.map((step, index) => {
+    const key = `${step.file}:${step.symbol}`
+    const missing = gone.has(key)
+    const hop = index + 1 < steps.length ? (broken.has(key) ? 'warn' : 'ok') : null
+    const hopText = hop === 'warn' ? t('doc.flowLinkGone') : t('doc.flowOk')
+    return `<div class="anchor-row">
+        <span>${esc(step.file)}:${esc(step.symbol)}</span>
+        <span class="state2 ${missing ? 'bad' : 'ok'}">
+          ${icon(missing ? 'alert' : 'check', 'icon icon-sm')}
+          ${esc(missing ? t('doc.flowStepGone') : t('doc.anchorOk'))}
+        </span>
+      </div>` + (hop === null ? '' : `<div class="anchor-row" style="padding-left:14px">
+        <span style="color:var(--fg-subtle)">${esc(hopText)}</span>
+        <span class="state2 ${hop}">${icon(hop === 'warn' ? 'alert' : 'check', 'icon icon-sm')}</span>
+      </div>`)
+  }).join('')
+}
+
+async function load() {
+  drawWaiting()
+  palette = await (await fetch('/api/palette')).json()
+  drawLegend()
+
+  const url = `/api/document?path=${encodeURIComponent(docPath)}&layout=${layout}&appearance=dark`
+  const res = await fetch(url)
+  if (!res.ok) {
+    document.body.innerHTML = `<div style="padding:60px;text-align:center;color:var(--fg-muted)">
+      ${esc(t('doc.notFound', { path: docPath }))}
+      <br><br><a class="btn" href="/">${esc(t('doc.toLibrary'))}</a></div>`
+    return
+  }
+  const view = await res.json()
+  current = view.document
+  saved = current.body
+
+  document.title = current.title
+  $('etitle').textContent = current.title
+  $('epath').textContent = current.path
+  $('ptitle').value = current.title
+  $('parea').value = current.area
+  $('psummary').value = current.summary
+  fitArea($('psummary'))
+
+  if (!editor) {
+    $('editor').classList.remove('editor-wait')
+    editor = createEditor($('editor'), {
+      value: current.body,
+      classes: palette.classes,
+      shapes: palette.shapes,
+      keywords: palette.keywords,
+      t,
+      onInput: scheduleRender,
+      onSave: save,
+    })
+  } else {
+    editor.value = current.body
+  }
+
+  statusSelect = createSelect($('selStatus'), {
+    value: current.status,
+    options: STATUS_LIST.map((s) => ({ value: s, label: s, dot: STATUS_DOT[s] })),
+    onChange: () => {},
+  })
+  if (!layoutSelect) {
+    layoutSelect = createSelect($('selLayout'), {
+      value: layout,
+      options: LAYOUTS.map((l) => ({ value: l, label: l })),
+      onChange: (next) => {
+        layout = next
+        remember(LAYOUT_KEY, next)
+        // Раскладка меняет всю геометрию, поэтому схема вписывается заново.
+        render(false)
+      },
+    })
+  }
+
+  drawChecked(current.checked?.by ?? '')
+  drawAnchors(view.broken)
+  drawFlow(view.flow ?? [])
+  showRender(view.render, false)
+}
+
+async function save() {
+  await fetch('/api/save', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      path: current.path, body: editor.value, status: statusSelect.value,
+      title: $('ptitle').value, area: $('parea').value, summary: $('psummary').value,
+    }),
+  })
+  saved = editor.value
+  setState('live', t('doc.stateSaved'))
+  setTimeout(() => setState('', ''), 1500)
+}
+
+$('boardPrev').addEventListener('click', () => stepBoard(-1))
+$('boardNext').addEventListener('click', () => stepBoard(1))
+/* Человек говорит, что сверил сам. Отдельно от сохранения: сохранение это
+   часто правка описания, и выдавать её за прочтение кода нельзя. */
+$('econfirm').addEventListener('click', async () => {
+  if (dirty()) await save()
+  await fetch('/api/confirm', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ path: current.path }),
+  })
+  setState('live', t('doc.confirmed'))
+  drawChecked('human')
+  setTimeout(() => setState('', ''), 2000)
+})
+
+$('esave').addEventListener('click', save)
+$('zin').addEventListener('click', () => zoomer?.zoomIn())
+$('zout').addEventListener('click', () => zoomer?.zoomOut())
+$('zfit').addEventListener('click', () => zoomer?.fit())
+for (const tab of document.querySelectorAll('.tab')) {
+  tab.addEventListener('click', () => {
+    for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t === tab)
+    $('pane-code').style.display = tab.dataset.tab === 'code' ? '' : 'none'
+    $('pane-props').style.display = tab.dataset.tab === 'props' ? '' : 'none'
+    // У спрятанной вкладки высота содержимого нулевая, поэтому поле
+    // подгоняется в момент показа, а не при загрузке документа.
+    if (tab.dataset.tab === 'props') fitArea($('psummary'))
+  })
+}
+
+$('esvg').addEventListener('click', () => {
+  const svg = $('stage').innerHTML
+  if (!svg.includes('<svg')) return
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = docPath.split('/').pop().replace(/\.d2$/, '') + '.svg'
+  a.click()
+  URL.revokeObjectURL(url)
+})
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (current) save() }
+})
+window.addEventListener('beforeunload', (e) => { if (dirty()) e.preventDefault() })
+window.addEventListener('resize', () => zoomer?.fit())
+
+load()
+</script>
+</body>
+</html>

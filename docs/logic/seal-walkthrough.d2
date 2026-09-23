@@ -1,0 +1,77 @@
+# title: Как документ сверяют с кодом
+# status: review
+# area: Docs
+# summary: Ход сверки по шагам: от правки кода до отметки. Показывает, в какой момент документ считается разошедшимся и что гасит этот признак.
+# updated: 2026-09-23
+# checked: agent 2026-09-24
+# anchors: src/logic/library.ts:checkAnchors@f0436c2aae787ad8, src/logic/library.ts:sealAnchors@cac3dbc22f9cb264, src/cli/hook.ts:runHook@ff78900d8869cf8d
+# flow: src/cli/hook.ts:runHook -> src/cli/hook.ts:atStart -> src/logic/library.ts:checkLibrary -> src/logic/library.ts:checkAnchors
+
+...@_palette
+
+direction: right
+
+dev: Кто правит код { class: actor }
+code: Код под якорем { class: store }
+scan: Скан { class: step }
+doc: Документ логики { class: artifact }
+seal: Отметка о сверке { class: done }
+
+dev -> code: меняет
+code -> scan: новый хеш тела
+scan -> doc: сверка якорей
+doc -> seal: перечитали
+
+steps: {
+  сверено: {
+    doc.style.stroke: "#3ecf8e"
+    seal.style.opacity: 1
+    note: |md
+      **Отпечаток стоит**
+
+      Хеш в якоре совпадает с хешем тела.
+      Документ считается верным, никто
+      ни о чём не напоминает.
+    | { class: note }
+  }
+
+  разошлось: {
+    code.style.stroke: "#e5484d"
+    doc.style.stroke: "#e5484d"
+    note: |md
+      **Тело переписали**
+
+      Файл и символ на месте, хеш другой.
+      Документ помечен разошедшимся, и хук
+      называет его в начале сессии.
+    | { class: note }
+  }
+
+  решение: {
+    doc.style.stroke: "#f5a623"
+    note: |md
+      **Развилка**
+
+      Поведение изменилось - правим документ.
+      Не изменилось - только отмечаем сверку.
+      Отметка без чтения гасит единственный
+      сигнал, ради которого якоря и заведены.
+    | { class: note }
+  }
+
+  кто сверял: {
+    doc.style.stroke: "#3ecf8e"
+    note: |md
+      **В отметке стоит имя**
+
+      Рядом с отпечатками пишется `agent`
+      или `human`. Агент ставит только `agent`,
+      слово `human` ставит человек кнопкой в
+      студии или флагом.
+
+      Без этого документ, который агент и
+      написал, и сам объявил верным, выглядел
+      бы так же, как прочитанный человеком.
+    | { class: note }
+  }
+}

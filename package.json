@@ -1,0 +1,53 @@
+{
+  "name": "aimd2",
+  "version": "0.9.0",
+  "description": "Logic map for a codebase: D2 diagrams of how the system behaves, anchored to the code so drift is visible",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onokashino/d2-ai-manager.git"
+  },
+  "homepage": "https://github.com/onokashino/d2-ai-manager#readme",
+  "bugs": "https://github.com/onokashino/d2-ai-manager/issues",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "aimd2": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "vendor/grammars",
+    "skills"
+  ],
+  "scripts": {
+    "build": "tsc && node scripts/copy-assets.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run check:render && npm run check:highlight",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "grammars": "node scripts/fetch-grammars.mjs",
+    "check:render": "tsx scripts/render-check.mjs",
+    "check:highlight": "node scripts/highlight-check.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@terrastruct/d2": "^0.1.33",
+    "d3": "^7.9.0",
+    "ignore": "^7.0.0",
+    "web-tree-sitter": "^0.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tree-sitter-javascript": "^0.25.0",
+    "tree-sitter-python": "^0.25.0",
+    "tree-sitter-rust": "^0.24.0",
+    "tree-sitter-typescript": "^0.23.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

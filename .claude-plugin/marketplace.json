@@ -1,0 +1,14 @@
+{
+  "name": "aimd2",
+  "owner": { "name": "unknow" },
+  "plugins": [
+    {
+      "name": "aimd2",
+      "source": "./",
+      "description": "Карта логики проекта в диаграммах D2: документы привязаны к коду, и консоль узнаёт, когда они разошлись",
+      "version": "0.9.0",
+      "category": "documentation",
+      "tags": ["d2", "diagrams", "documentation", "architecture"]
+    }
+  ]
+}

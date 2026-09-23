@@ -1,0 +1,44 @@
+# title: Правила записи узлов
+# status: review
+# area: Storage
+# summary: Запись узла это несколько операций, и они идут одной точкой отката: сбой в середине оставил бы узел без записи в истории. Узел с источником human автоматика не трогает ни при обновлении, ни при пометке удаления. Любое изменение дописывает ревизию, ничего не перезаписывается поверх.
+# updated: 2026-09-22
+# checked: agent 2026-09-23
+# anchors: src/store/nodes.ts:upsertNode@a337be4bbc4ada9d, src/store/nodes.ts:markNodesRemoved@414ccd4d16bdd673, src/store/tx.ts:inSavepoint@d171c26b65d5cfa0
+
+...@_palette
+
+direction: down
+
+incoming: Пришёл узел от парсера { class: step }
+known: Узел уже известен? { class: choice }
+human: Источник human? { class: choice }
+same: Что-то изменилось? { class: choice }
+
+create: Создать узел { class: done }
+update: Обновить поля { class: step }
+protect: Правка человека сильнее { class: danger }
+skip: Ничего не делать { class: gone }
+revision: Дописать ревизию { class: store }
+
+incoming -> known
+known -> create: нет
+known -> human: да
+human -> protect: да { class: error }
+human -> same: нет
+same -> skip: нет, всё совпало { class: weak }
+same -> update: да
+
+create -> revision { class: data }
+update -> revision { class: data }
+
+savepoint: |md
+  **Одна точка отката**
+
+  Узел, его якоря и ревизия пишутся
+  тремя операциями. Без общей точки
+  отката сбой на любой из них оставил
+  бы узел без истории.
+| { class: note }
+
+revision -> savepoint { class: weak }

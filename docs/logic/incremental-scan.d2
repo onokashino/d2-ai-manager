@@ -1,0 +1,59 @@
+# title: Инкрементальный скан
+# status: review
+# area: Scan
+# summary: Повторный скан разбирает только изменившиеся файлы. Изменение определяется по хешу содержимого, а для файлов без известного языка по размеру и времени правки. Исчезнувший файл не удаляет свои узлы, они получают статус removed, а запись о файле забывается, иначе вернувшийся файл сочли бы неизменившимся и никогда не перечитали.
+# updated: 2026-09-24
+# checked: agent 2026-09-24
+# anchors: src/scan/pipeline.ts:scanProject@ed6ac56a7a9def78, src/scan/incremental.ts:diffFiles@55935eb8f6242b48, src/scan/incremental.ts:forgetFiles@60d3955ca67ab70d
+
+...@_palette
+
+direction: down
+
+walk: Обход файлов { class: step }
+diff: Сравнение с прошлым сканом { class: choice }
+
+changed: Изменившиеся { class: step }
+unchanged: Пропуск целиком { class: gone }
+removed: Исчезнувшие { class: danger }
+
+parse: Разбор и запись узлов { class: step }
+calls: Рёбра вызовов { class: step }
+tomb: Пометка removed { class: danger }
+forget: Забыть запись о файле { class: store }
+graph: Карта проекта { class: store }
+
+walk -> diff: путь и хеш каждого файла
+diff -> changed: хеш другой
+diff -> unchanged: хеш тот же { class: weak }
+diff -> removed: файла больше нет { class: error }
+
+changed -> parse
+parse -> calls: вызовы из разбора { class: data }
+parse -> graph: узлы, якоря { class: data }
+calls -> graph: рёбра между символами { class: data }
+removed -> tomb { class: error }
+tomb -> forget: иначе возврат файла сочтут неизменением
+forget -> graph { class: data }
+
+later: |md
+  **Почему вызовы разрешаются потом**
+
+  Вызов уходит в другой файл, а тот на момент
+  разбора может быть ещё не прочитан, и его
+  символа в базе нет. Поэтому вызовы копятся
+  и разрешаются вторым проходом, когда узлы
+  всего скана уже записаны.
+| { class: note }
+
+calls -> later { class: weak }
+
+rule: |md
+  **Почему узлы не удаляются**
+
+  У узла есть история правок по сессиям.
+  Удаление строки унесло бы историю вместе с ней,
+  поэтому узел живёт со статусом removed.
+| { class: note }
+
+tomb -> rule { class: weak }

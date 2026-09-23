@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23121212'/%3E%3Cpath d='M7 15h10M12 15V9' stroke='%233ecf8e' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='7' r='2' fill='%233ecf8e'/%3E%3C/svg%3E">
+<title data-i18n="library.pageTitle">Библиотека логики</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+  .page { display: grid; grid-template-columns: 248px 1fr; height: 100%; }
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 16px; overflow-y: auto; display: flex; flex-direction: column;
+  }
+  .showing { font-family: var(--mono); font-size: var(--t-xs); color: var(--fg-subtle); margin: 14px 0 18px; }
+  .sidebar .grow { flex: 1; }
+
+  .head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 22px 28px 16px; border-bottom: 1px solid var(--border);
+  }
+  .head h1 { font-size: var(--t-2xl); margin: 0 0 3px; font-weight: 600; letter-spacing: -.02em; }
+  .head .path { font-family: var(--mono); font-size: var(--t-xs); color: var(--fg-subtle); }
+  .head .total { text-align: right; }
+  .head .total b { display: block; font-size: 28px; font-weight: 600; line-height: 1; letter-spacing: -.02em; }
+  .head .total span { font-family: var(--mono); font-size: var(--t-2xs); color: var(--fg-subtle); letter-spacing: .08em; text-transform: uppercase; }
+
+  .cols, .row { display: grid; grid-template-columns: 1fr 120px 132px 104px; gap: 16px; }
+  .cols {
+    padding: 10px 28px; position: sticky; top: 0; z-index: 5; background: var(--bg);
+    font-family: var(--mono); font-size: var(--t-2xs); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--fg-subtle); border-bottom: 1px solid var(--border);
+  }
+  #rows { overflow-y: auto; height: calc(100% - 92px); }
+  .row { align-items: center; padding: 15px 28px; border-bottom: 1px solid var(--border); transition: background .1s; }
+  .row:hover { background: var(--surface); }
+  .row h3 { margin: 0 0 4px; font-size: var(--t-md); font-weight: 550; letter-spacing: -.01em; }
+  .row h3 a { color: inherit; text-decoration: none; }
+  .row h3 a:hover { color: var(--brand); }
+  .row p { margin: 0 0 7px; color: var(--fg-muted); font-size: var(--t-sm); line-height: 1.5; }
+  .row .meta { display: flex; align-items: center; gap: 12px; font-family: var(--mono); font-size: var(--t-xs); color: var(--fg-subtle); }
+  .row .meta .bit { display: inline-flex; align-items: center; gap: 4px; }
+  .row .area { font-size: var(--t-sm); color: var(--fg-muted); }
+  .row .diverged { color: var(--red); }
+  /* Переписанный код это не поломка, а повод перечитать документ. */
+  .row .changed { color: var(--amber); }
+  .row .byhuman { color: var(--brand); }
+  .open-link { text-decoration: none; }
+  .empty { padding: 72px 28px; text-align: center; color: var(--fg-muted); }
+  .empty .icon-lg { color: var(--fg-subtle); margin-bottom: 12px; }
+  .empty code { font-family: var(--mono); font-size: var(--t-sm); background: var(--card); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="app">
+<div class="page">
+  <div class="sidebar">
+    <a class="brand" href="/">
+      <span class="mark" id="brandMark"></span>
+      <span><b data-i18n="app.name"></b><br><em data-i18n="app.tag"></em></span>
+    </a>
+    <div class="showing" id="showing"><span class="skel skel-line" style="width:120px;display:inline-block"></span></div>
+
+    <div class="section-label" id="lblSearch"></div>
+    <div class="input-wrap">
+      <span class="icon-slot" id="searchIcon"></span>
+      <input id="q" class="input" type="text" data-i18n-placeholder="library.searchPlaceholder" autocomplete="off">
+    </div>
+
+    <div class="section-label" id="lblStatus"></div>
+    <div id="selStatus"><div class="skel skel-box"></div></div>
+
+    <div class="section-label" id="lblArea"></div>
+    <div id="selArea"><div class="skel skel-box"></div></div>
+
+    <div class="section-label" id="lblSync"></div>
+    <div id="selSync"><div class="skel skel-box"></div></div>
+
+    <div class="grow"></div>
+    <div class="divider"></div>
+    <a class="btn btn-block" href="/guide" id="toguide" style="text-decoration:none;margin-bottom:6px"></a>
+    <a class="btn btn-block" href="/graph" id="tograph" style="text-decoration:none"></a>
+    <div id="selLang" style="margin-top:6px"></div>
+  </div>
+
+  <section style="overflow:hidden">
+    <div class="head">
+      <div>
+        <h1 data-i18n="library.title"></h1>
+        <div class="path" id="root"><span class="skel skel-line" style="width:220px;display:inline-block"></span></div>
+      </div>
+      <div class="total"><b id="total">&nbsp;</b><span data-i18n="library.total"></span></div>
+    </div>
+    <div class="cols">
+      <span data-i18n="library.colDoc"></span>
+      <span data-i18n="library.colArea"></span>
+      <span data-i18n="library.colStatus"></span>
+      <span></span>
+    </div>
+    <div id="rows"></div>
+  </section>
+</div>
+</div>
+
+<script type="module">
+import { icon } from '/icons.js'
+import { createSelect } from '/ui.js'
+import { STATUS_DOT, STATUS_LIST, esc, docHref } from '/shared.js'
+import { initLang, applyI18n, t, LANGS, currentLang, setLang } from '/i18n.js'
+
+const $ = (id) => document.getElementById(id)
+
+initLang()
+applyI18n()
+
+let library = { entries: [], areas: [], root: '', docsDir: '' }
+
+// Состояние фильтров живёт в адресе, поэтому ссылку можно сохранить и переслать.
+const params = new URLSearchParams(location.search)
+const filters = {
+  q: params.get('q') ?? '',
+  status: params.get('status') ?? '',
+  area: params.get('area') ?? '',
+  sync: params.get('sync') ?? '',
+}
+
+function pushUrl() {
+  const next = new URLSearchParams()
+  for (const [key, value] of Object.entries(filters)) if (value) next.set(key, value)
+  const query = next.toString()
+  history.replaceState(null, '', query ? `/?${query}` : '/')
+}
+
+function paintStatics() {
+  $('brandMark').innerHTML = icon('network', 'icon')
+  $('searchIcon').innerHTML = icon('search', 'icon icon-sm')
+  $('lblSearch').innerHTML = icon('search', 'icon icon-sm') + `<span>${esc(t('library.search'))}</span>`
+  $('lblStatus').innerHTML = icon('filter', 'icon icon-sm') + `<span>${esc(t('library.status'))}</span>`
+  $('lblArea').innerHTML = icon('layers', 'icon icon-sm') + `<span>${esc(t('library.area'))}</span>`
+  $('lblSync').innerHTML = icon('anchor', 'icon icon-sm') + `<span>${esc(t('library.sync'))}</span>`
+  $('toguide').innerHTML = icon('book', 'icon icon-sm') + `<span>${esc(t('nav.guide'))}</span>`
+  $('tograph').innerHTML = icon('git-branch', 'icon icon-sm') + `<span>${esc(t('nav.codemap'))}</span>`
+
+  createSelect($('selLang'), {
+    value: currentLang(),
+    options: LANGS.map((l) => ({ value: l.code, label: l.label })),
+    onChange: setLang,
+  })
+}
+
+/* Строки-заглушки повторяют геометрию настоящих: когда данные приедут, на
+   их месте уже стоит ровно такой же блок, и список не дёргается. */
+function drawSkeleton(count = 4) {
+  const line = (w, h = 10, top = 0) =>
+    `<div class="skel skel-line" style="width:${w};height:${h}px;margin-top:${top}px"></div>`
+
+  $('rows').innerHTML = Array.from({ length: count }, () => `
+    <div class="row">
+      <div>
+        ${line('42%', 14)}
+        ${line('92%', 10, 10)}
+        ${line('74%', 10, 6)}
+        ${line('180px', 9, 12)}
+      </div>
+      <div>${line('56px')}</div>
+      <div>${line('74px', 20)}</div>
+      <div>${line('68px', 26)}</div>
+    </div>`).join('')
+}
+
+function drawRows() {
+  const q = filters.q.trim().toLowerCase()
+  const rows = library.entries.filter((e) => {
+    if (filters.status && e.status !== filters.status) return false
+    if (filters.area && e.area !== filters.area) return false
+    if (filters.sync === 'broken' && e.broken + e.drifted === 0) return false
+    if (filters.sync === 'clean' && e.broken + e.drifted > 0) return false
+    if (!q) return true
+    return (e.title + ' ' + e.summary + ' ' + e.path).toLowerCase().includes(q)
+  })
+
+  $('total').textContent = library.entries.length
+  $('showing').textContent = t('library.showing', { n: rows.length, all: library.entries.length })
+
+  if (library.entries.length === 0) {
+    $('rows').innerHTML = `<div class="empty">
+      ${icon('book', 'icon icon-lg')}
+      <div>${esc(t('library.emptyTitle'))}</div>
+      <div style="margin-top:10px">${t('library.emptyWhere', {
+        dir: `<code>${esc(library.docsDir)}</code>`,
+        ext: '<code>.d2</code>',
+      })}</div>
+      <div style="margin-top:14px">${esc(t('library.emptyHow'))} <code>aimd2 logic new</code></div>
+    </div>`
+    return
+  }
+
+  $('rows').innerHTML = rows.map((e) => `
+    <div class="row appear">
+      <div>
+        <h3><a href="${docHref(e.path)}">${esc(e.title)}</a></h3>
+        <p>${esc(e.summary)}</p>
+        <div class="meta">
+          <span class="bit">${icon('file-text', 'icon icon-sm')}${esc(e.path.split('/').pop())}</span>
+          ${e.updated ? `<span class="bit">${esc(e.updated)}</span>` : ''}
+          ${e.anchors ? `<span class="bit">${icon('anchor', 'icon icon-sm')}${e.anchors}</span>` : ''}
+          ${e.broken ? `<span class="bit diverged">${icon('alert', 'icon icon-sm')}${esc(t('library.diverged', { n: e.broken }))}</span>` : ''}
+          ${e.drifted ? `<span class="bit changed">${icon('alert', 'icon icon-sm')}${esc(t('library.drifted', { n: e.drifted }))}</span>` : ''}
+          ${e.checkedBy === 'human' ? `<span class="bit byhuman">${icon('check', 'icon icon-sm')}${esc(t('library.byHuman'))}</span>` : ''}
+          ${e.status === 'approved' && e.checkedBy !== 'human' ? `<span class="bit changed">${icon('alert', 'icon icon-sm')}${esc(t('library.notConfirmed'))}</span>` : ''}
+        </div>
+      </div>
+      <div class="area">${esc(e.area)}</div>
+      <div><span class="badge b-${e.status}"><span class="dot"></span>${e.status}</span></div>
+      <div><a class="btn btn-sm open-link" href="${docHref(e.path)}">${esc(t('action.open'))}</a></div>
+    </div>`).join('')
+}
+
+function buildSelects() {
+  createSelect($('selStatus'), {
+    value: filters.status,
+    options: [{ value: '', label: t('library.allStatuses') }, ...STATUS_LIST.map((s) => ({ value: s, label: s, dot: STATUS_DOT[s] }))],
+    onChange: (v) => { filters.status = v; pushUrl(); drawRows() },
+  })
+  createSelect($('selArea'), {
+    value: filters.area,
+    options: [{ value: '', label: t('library.allAreas') }, ...library.areas.map((a) => ({ value: a, label: a }))],
+    onChange: (v) => { filters.area = v; pushUrl(); drawRows() },
+  })
+  createSelect($('selSync'), {
+    value: filters.sync,
+    options: [
+      { value: '', label: t('library.allDocs') },
+      { value: 'broken', label: t('library.onlyBroken'), dot: 'var(--red)' },
+      { value: 'clean', label: t('library.onlyClean'), dot: 'var(--brand)' },
+    ],
+    onChange: (v) => { filters.sync = v; pushUrl(); drawRows() },
+  })
+}
+
+$('q').value = filters.q
+$('q').addEventListener('input', (e) => { filters.q = e.target.value; pushUrl(); drawRows() })
+
+paintStatics()
+drawSkeleton()
+
+library = await (await fetch('/api/library')).json()
+$('root').textContent = library.root + '/' + library.docsDir
+buildSelects()
+drawRows()
+</script>
+</body>
+</html>

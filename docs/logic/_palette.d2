@@ -1,0 +1,104 @@
+# title: Палитра
+# status: approved
+# area: System
+# summary: Словарь форм и цветов для документов логики. Подключается строкой с тремя точками и именем файла, поэтому документ остаётся обычным d2 и открывается любым сторонним инструментом. Роль сущности задаётся классом, а не ручным стилем: так одинаковые вещи выглядят одинаково во всех документах.
+# updated: 2026-09-22
+
+vars: {
+  d2-config: {
+    layout-engine: dagre
+  }
+}
+
+# Подписи на связях d2 пишет курсивом и приглушённым цветом, читать тяжело.
+# Правится это не здесь: глобы не проходят через импорт. Строку со стилем
+# подписей приписывает сам рендерер, см. PRELUDE в src/logic/render.ts.
+
+classes: {
+  # Кто действует: человек, агент, внешняя служба.
+  # Форма person в d2 растягивается вместе с подписью и выглядит сплющенной,
+  # поэтому роль показывает иконка, а сама рамка остаётся прямоугольной.
+  actor: {
+    icon: data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233ecf8e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E
+    style: { fill: "#16352a"; stroke: "#3ecf8e"; font-color: "#d6f5e6"; stroke-width: 2; border-radius: 6 }
+  }
+
+  # Шаг обработки, обычное действие системы.
+  step: {
+    shape: rectangle
+    style: { fill: "#1b2a3d"; stroke: "#5b9cff"; font-color: "#dbe7ff"; border-radius: 6 }
+  }
+
+  # Развилка: дальше возможны разные пути.
+  choice: {
+    shape: diamond
+    style: { fill: "#3a2d14"; stroke: "#f5a623"; font-color: "#ffe8c2" }
+  }
+
+  # Где данные лежат: таблица, кеш, файл.
+  store: {
+    shape: cylinder
+    style: { fill: "#2a1f3d"; stroke: "#c77dff"; font-color: "#ecdcff" }
+  }
+
+  # Очередь или поток событий.
+  queue: {
+    shape: queue
+    style: { fill: "#132f2f"; stroke: "#3ecfc4"; font-color: "#cdf3f0" }
+  }
+
+  # Чужая система за границей проекта.
+  external: {
+    shape: cloud
+    style: { fill: "#242424"; stroke: "#8a8a8a"; font-color: "#cfcfcf"; stroke-dash: 3 }
+  }
+
+  # Артефакт: документ, отчёт, выгрузка.
+  artifact: {
+    shape: document
+    style: { fill: "#232323"; stroke: "#a1a1a1"; font-color: "#ededed" }
+  }
+
+  # Состояние сущности, например статус заявки.
+  state: {
+    shape: oval
+    style: { fill: "#1f2937"; stroke: "#9aa7bd"; font-color: "#e4e9f2" }
+  }
+
+  # Правило или запрет, на который нельзя закрыть глаза.
+  danger: {
+    shape: rectangle
+    style: { fill: "#3a1b1d"; stroke: "#e5484d"; font-color: "#ffd9da"; stroke-width: 2 }
+  }
+
+  # Успешное завершение пути.
+  done: {
+    shape: rectangle
+    style: { fill: "#16352a"; stroke: "#3ecf8e"; font-color: "#d6f5e6"; border-radius: 6 }
+  }
+
+  # То, чего уже нет: удалённое поведение, legacy.
+  gone: {
+    style: { fill: "#1c1c1c"; stroke: "#5a5a5a"; font-color: "#8a8a8a"; stroke-dash: 4; opacity: 0.75 }
+  }
+
+  # Пояснение сбоку, без рамки: это не шаг, а текст.
+  note: {
+    style: { fill: "transparent"; stroke: "transparent"; font-color: "#a1a1a1" }
+  }
+
+  ## Связи
+  # Класс вешается на стрелку так же, как на узел.
+
+  # Отложенное: событие, фоновая задача, ответ придёт позже.
+  async: { style: { stroke-dash: 3; stroke: "#a1a1a1" } }
+
+  # Ветка ошибки или отказа.
+  error: { style: { stroke: "#e5484d"; stroke-width: 2 } }
+
+  # Поток данных, а не управления.
+  data: { style: { stroke: "#c77dff" } }
+
+  # Второстепенная связь, на которую можно не смотреть при первом чтении.
+  weak: { style: { stroke: "#5a5a5a"; stroke-dash: 2; opacity: 0.8 } }
+}

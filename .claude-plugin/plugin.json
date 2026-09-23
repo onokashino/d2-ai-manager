@@ -1,0 +1,10 @@
+{
+  "name": "aimd2",
+  "description": "Карта логики проекта в диаграммах D2: документы привязаны к коду, и консоль узнаёт, когда они разошлись",
+  "version": "0.9.0",
+  "author": { "name": "unknow" },
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/onokashino/d2-ai-manager#readme",
+  "repository": "https://github.com/onokashino/d2-ai-manager",
+  "keywords": ["d2", "diagrams", "documentation", "architecture"]
+}
